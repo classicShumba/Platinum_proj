@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Add employee and purchase order button to approval form -->
+    <record id="approval_request_form_employee_fields" model="ir.ui.view">
+        <field name="name">approval.request.form.employee.fields</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Add purchase order button -->
+            <div name="button_box" position="inside">
+                <button type="object" name="action_view_purchase_order"
+                        class="oe_stat_button" icon="fa-shopping-cart"
+                        invisible="not purchase_order_id">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Purchase Order</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Add employee fields in a new group -->
+            <group name="request_details" position="after">
+                <group string="Employee Information" name="employee_info">
+                    <field name="employee_id"/>
+                    <field name="manager_employee_id"/>
+                    <field name="portal_submission"/>
+                </group>
+                <group string="Integration" name="integration_info">
+                    <field name="budget_line_id"/>
+                    <field name="purchase_order_id" readonly="1"/>
+                </group>
+            </group>
+        </field>
+    </record>
+
+</odoo>

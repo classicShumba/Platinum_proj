@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Portal layout for approvals -->
+    <template id="portal_my_approvals" name="My Approvals">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Approval Requests</t>
+            </t>
+
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3>My Approval Requests</h3>
+                    <a href="/my/approval/new" class="btn btn-primary">
+                        <i class="fa fa-plus"/> New Request
+                    </a>
+                </div>
+
+                <t t-if="not grouped_approvals">
+                    <div class="alert alert-info">
+                        <p class="mb-0">You haven't submitted any approval requests yet.</p>
+                        <a href="/my/approval/new" class="btn btn-sm btn-primary mt-2">
+                            Submit Your First Request
+                        </a>
+                    </div>
+                </t>
+
+                <t t-foreach="grouped_approvals" t-as="approvals">
+                    <div class="row">
+                        <t t-foreach="approvals" t-as="approval">
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="card-title">
+                                            <a t-attf-href="/my/approval/#{approval.id}"
+                                               class="text-decoration-none">
+                                                <t t-esc="approval.name"/>
+                                            </a>
+                                        </h5>
+                                        <p class="card-text">
+                                            <strong>Category:</strong> <t t-esc="approval.category_id.name"/><br/>
+                                            <t t-if="approval.amount">
+                                                <strong>Amount:</strong>
+                                                <span t-field="approval.amount" t-options="{'widget': 'monetary', 'display_currency': approval.company_id.currency_id}"/>
+                                                <br/>
+                                            </t>
+                                            <strong>Date:</strong> <t t-esc="approval.create_date" t-options="{'widget': 'date'}"/>
+                                        </p>
+                                        <div class="mt-auto">
+                                            <span class="badge"
+                                                  t-attf-class="badge-#{
+                                                      'success' if approval.request_status == 'approved'
+                                                      else 'warning' if approval.request_status == 'pending'
+                                                      else 'danger' if approval.request_status == 'refused'
+                                                      else 'secondary'
+                                                  }">
+                                                <t t-esc="approval.request_status.title()"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+
+                <t t-call="portal.pager"/>
+            </div>
+        </t>
+    </template>
+
+    <!-- Portal template for approval request detail -->
+    <template id="portal_approval_detail" name="Approval Request Detail">
+        <t t-call="portal.portal_layout">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h4 class="mb-0">
+                                    <t t-esc="approval.name"/>
+                                </h4>
+                                <span class="badge badge-lg"
+                                      t-attf-class="badge-#{
+                                          'success' if approval.request_status == 'approved'
+                                          else 'warning' if approval.request_status == 'pending'
+                                          else 'danger' if approval.request_status == 'refused'
+                                          else 'secondary'
+                                      }">
+                                    <t t-esc="approval.request_status.title()"/>
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Category:</strong> <t t-esc="approval.category_id.name"/></p>
+                                        <p><strong>Submitted:</strong> <t t-esc="approval.create_date" t-options="{'widget': 'datetime'}"/></p>
+                                        <t t-if="approval.date_confirmed">
+                                            <p><strong>Confirmed:</strong> <t t-esc="approval.date_confirmed" t-options="{'widget': 'datetime'}"/></p>
+                                        </t>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <t t-if="approval.amount">
+                                            <p><strong>Amount:</strong>
+                                                <span t-field="approval.amount" t-options="{'widget': 'monetary', 'display_currency': approval.company_id.currency_id}"/>
+                                            </p>
+                                        </t>
+                                        <t t-if="approval.partner_id">
+                                            <p><strong>Vendor:</strong> <t t-esc="approval.partner_id.name"/></p>
+                                        </t>
+                                        <t t-if="approval.reference">
+                                            <p><strong>Reference:</strong> <t t-esc="approval.reference"/></p>
+                                        </t>
+                                    </div>
+                                </div>
+
+                                <t t-if="approval.reason">
+                                    <h5>Description</h5>
+                                    <div t-field="approval.reason" class="mb-3"/>
+                                </t>
+
+                                <t t-if="approval.approver_ids">
+                                    <h5>Approval Status</h5>
+                                    <div class="list-group">
+                                        <t t-foreach="approval.approver_ids" t-as="approver">
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong><t t-esc="approver.user_id.name"/></strong>
+                                                    <small class="text-muted d-block"><t t-esc="approver.user_id.partner_id.function or 'Approver'"/></small>
+                                                </div>
+                                                <span class="badge"
+                                                      t-attf-class="badge-#{
+                                                          'success' if approver.status == 'approved'
+                                                          else 'danger' if approver.status == 'refused'
+                                                          else 'warning' if approver.status == 'pending'
+                                                          else 'secondary'
+                                                      }">
+                                                    <t t-esc="approver.status.title()"/>
+                                                </span>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </t>
+
+                                <t t-if="approval.attachment_ids">
+                                    <h5 class="mt-4">Attachments</h5>
+                                    <div class="list-group">
+                                        <t t-foreach="approval.attachment_ids" t-as="attachment">
+                                            <a t-attf-href="/web/content/#{attachment.id}?download=true"
+                                               class="list-group-item list-group-item-action">
+                                                <i class="fa fa-file-o"/> <t t-esc="attachment.name"/>
+                                            </a>
+                                        </t>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <a href="/my/approvals" class="btn btn-secondary">
+                                <i class="fa fa-arrow-left"/> Back to My Requests
+                            </a>
+                            <t t-if="approval.request_status in ['new', 'pending']">
+                                <a t-attf-href="/my/approval/edit/#{approval.id}" class="btn btn-warning ms-2">
+                                    <i class="fa fa-edit"/> Edit Request
+                                </a>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Portal template for category selection -->
+    <template id="portal_approval_categories" name="New Approval Request - Categories">
+        <t t-call="portal.portal_layout">
+            <div class="container">
+                <h3 class="mb-4">Select Request Type</h3>
+
+                <div class="row">
+                    <t t-foreach="categories" t-as="category">
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <a t-attf-href="/my/approval/new/#{category.id}" class="text-decoration-none">
+                                <div class="card h-100 hover-shadow">
+                                    <div class="card-body text-center">
+                                        <t t-if="category.image">
+                                            <img t-attf-src="data:image/png;base64,#{category.image}"
+                                                 class="mb-3" style="max-height: 60px;"/>
+                                        </t>
+                                        <h5 class="card-title">
+                                            <t t-esc="category.name"/>
+                                        </h5>
+                                        <p class="card-text text-muted">
+                                            <t t-if="category.description">
+                                                <t t-esc="category.description"/>
+                                            </t>
+                                            <t t-else="">
+                                                Submit a <t t-esc="category.name"/> request
+                                            </t>
+                                        </p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    </t>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="/my/approvals" class="btn btn-secondary">
+                        <i class="fa fa-arrow-left"/> Back to My Requests
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Portal template for new approval request form -->
+    <template id="portal_approval_new" name="New Approval Request">
+        <t t-call="portal.portal_layout">
+            <div class="container o_approval_portal_form">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <h3 class="mb-4">
+                            <t t-if="edit_mode">Edit</t>
+                            <t t-else="">New</t>
+                            <t t-esc="category.name"/> Request
+                        </h3>
+
+                        <form method="post" enctype="multipart/form-data" class="o_approval_portal_form">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <t t-if="edit_mode">
+                                <input type="hidden" name="approval_id" t-att-value="approval.id"/>
+                            </t>
+
+                            <div class="card">
+                                <div class="card-body">
+                                    <!-- Request Title -->
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">Request Title *</label>
+                                        <input type="text" class="form-control" id="name" name="name" required="required"
+                                               placeholder="Brief description of your request"
+                                               t-att-value="approval.name if edit_mode else ''"/>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div class="mb-3">
+                                        <label for="reason" class="form-label">Description *</label>
+                                        <textarea class="form-control" id="reason" name="reason" rows="4" required="required"
+                                                  placeholder="Provide detailed information about your request"><t t-if="edit_mode" t-esc="approval.reason"/></textarea>
+                                    </div>
+
+                                    <!-- Conditional Fields based on Category -->
+                                    <div class="mb-3 o_field_amount" t-if="category.has_amount != 'no'">
+                                        <label for="amount" class="form-label">
+                                            Amount
+                                            <span t-if="category.has_amount == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" class="form-control" id="amount" name="amount" step="0.01"
+                                                   placeholder="0.00" t-att-required="category.has_amount == 'required'"
+                                                   t-att-value="approval.amount if edit_mode else ''"/>
+                                        </div>
+                                        <div class="o_budget_info"></div>
+                                    </div>
+
+                                    <div class="mb-3 o_field_quantity" t-if="category.has_quantity != 'no'">
+                                        <label for="quantity" class="form-label">
+                                            Quantity
+                                            <span t-if="category.has_quantity == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <input type="number" class="form-control" id="quantity" name="quantity" step="1"
+                                               placeholder="Enter quantity" t-att-required="category.has_quantity == 'required'"/>
+                                    </div>
+
+                                    <div class="mb-3 o_field_date" t-if="category.has_date != 'no'">
+                                        <label for="date" class="form-label">
+                                            Date
+                                            <span t-if="category.has_date == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <input type="date" class="form-control" id="date" name="date"
+                                               t-att-required="category.has_date == 'required'"/>
+                                    </div>
+
+                                    <div class="row o_field_period" t-if="category.has_period != 'no'">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="date_start" class="form-label">
+                                                Start Date
+                                                <span t-if="category.has_period == 'required'" class="text-danger">*</span>
+                                            </label>
+                                            <input type="date" class="form-control" id="date_start" name="date_start"
+                                                   t-att-required="category.has_period == 'required'"/>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="date_end" class="form-label">
+                                                End Date
+                                                <span t-if="category.has_period == 'required'" class="text-danger">*</span>
+                                            </label>
+                                            <input type="date" class="form-control" id="date_end" name="date_end"
+                                                   t-att-required="category.has_period == 'required'"/>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3 o_field_location" t-if="category.has_location != 'no'">
+                                        <label for="location" class="form-label">
+                                            Location
+                                            <span t-if="category.has_location == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="location" name="location"
+                                               placeholder="Enter location" t-att-required="category.has_location == 'required'"/>
+                                    </div>
+
+                                    <div class="mb-3 o_field_reference" t-if="category.has_reference != 'no'">
+                                        <label for="reference" class="form-label">
+                                            Reference
+                                            <span t-if="category.has_reference == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="reference" name="reference"
+                                               placeholder="Enter reference number" t-att-required="category.has_reference == 'required'"/>
+                                    </div>
+
+                                    <div class="mb-3 o_field_partner" t-if="category.has_partner != 'no' and partners">
+                                        <label for="partner_id" class="form-label">
+                                            Vendor/Contact
+                                            <span t-if="category.has_partner == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-control" id="partner_id" name="partner_id"
+                                                t-att-required="category.has_partner == 'required'">
+                                            <option value="">Select a vendor...</option>
+                                            <t t-foreach="partners" t-as="partner">
+                                                <option t-att-value="partner.id" t-esc="partner.name"/>
+                                            </t>
+                                        </select>
+                                    </div>
+
+                                    <!-- Simplified Product Lines for Equipment/Items -->
+                                    <div class="mb-3" t-if="category.has_product != 'no'" id="product_lines_section">
+                                        <label class="form-label">
+                                            Equipment / Items Requested
+                                            <span t-if="category.has_product == 'required'" class="text-danger">*</span>
+                                        </label>
+
+                                        <!-- Product Search Input -->
+                                        <div class="product-search-container position-relative mb-3">
+                                            <input type="text" class="form-control" id="product_search_input"
+                                                   placeholder="Type product name to search or create..."
+                                                   autocomplete="off"/>
+                                            <div class="product-suggestions position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm"
+                                                 id="product_suggestions" style="display: none; z-index: 1050; max-height: 200px; overflow-y: auto;">
+                                            </div>
+                                        </div>
+
+                                        <!-- Add Item Form -->
+                                        <div class="card mb-3" id="add_item_form" style="display: none;">
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Product Name</label>
+                                                        <input type="text" class="form-control" id="selected_product_name" readonly="readonly"/>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Description</label>
+                                                        <input type="text" class="form-control" id="product_description" placeholder="Enter description"/>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">Quantity</label>
+                                                        <input type="number" class="form-control" id="product_quantity" min="0.01" step="0.01" value="1"/>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label">&#160;</label>
+                                                        <div>
+                                                            <button type="button" class="btn btn-primary" id="add_item_btn">Add</button>
+                                                            <button type="button" class="btn btn-secondary ms-1" id="cancel_item_btn">Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Items List -->
+                                        <div id="items_list">
+                                            <div class="alert alert-info" id="no_items_message">
+                                                <i class="fa fa-info-circle"></i> No items added yet. Search for products above to get started.
+                                            </div>
+                                        </div>
+
+                                        <!-- Hidden inputs for form submission -->
+                                        <div id="hidden_inputs"></div>
+
+                                        <!-- Pre-populate existing products in edit mode -->
+                                        <t t-if="edit_mode and approval.product_line_ids">
+                                            <script type="application/json" id="existing_products">
+                                                [
+                                                    <t t-foreach="approval.product_line_ids" t-as="line">
+                                                        {
+                                                            "id": <t t-esc="line.product_id.id if line.product_id else 'null'"/>,
+                                                            "name": "<t t-esc="line.product_id.name if line.product_id else line.description"/>",
+                                                            "description": "<t t-esc="line.description"/>",
+                                                            "quantity": <t t-esc="line.quantity"/>,
+                                                            "uom_id": <t t-esc="line.product_id.uom_id.id if line.product_id and line.product_id.uom_id else 1"/>,
+                                                            "is_new": <t t-esc="'true' if not line.product_id else 'false'"/>
+                                                        }<t t-if="not line_last">,</t>
+                                                    </t>
+                                                ]
+                                            </script>
+                                        </t>
+                                    </div>
+
+                                    <!-- File Attachments -->
+                                    <div class="mb-3" t-if="category.requirer_document != 'no'">
+                                        <label for="attachments" class="form-label">
+                                            Attachments
+                                            <span t-if="category.requirer_document == 'required'" class="text-danger">*</span>
+                                        </label>
+                                        <input type="file" class="form-control" id="attachments" name="attachments" multiple="multiple"
+                                               t-att-required="category.requirer_document == 'required'"/>
+                                        <small class="form-text text-muted">
+                                            You can upload multiple files (documents, quotes, etc.)
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div class="card-footer">
+                                    <div class="d-flex justify-content-between">
+                                        <a href="/my/approval/new" class="btn btn-secondary">
+                                            <i class="fa fa-arrow-left"/> Back
+                                        </a>
+                                        <button type="submit" class="btn btn-primary o_approval_submit">
+                                            <i class="fa fa-paper-plane"/> Submit Request
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

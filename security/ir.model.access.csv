@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_approval_request_portal,approval.request.portal,approvals.model_approval_request,base.group_portal,1,1,1,0
+access_approval_category_portal,approval.category.portal,approvals.model_approval_category,base.group_portal,1,0,0,0
+access_approval_approver_portal,approval.approver.portal,approvals.model_approval_approver,base.group_portal,1,0,0,0
+access_approval_product_line_portal,approval.product.line.portal,approvals.model_approval_product_line,base.group_portal,1,1,1,0
+access_ir_attachment_portal,ir.attachment.portal,base.model_ir_attachment,base.group_portal,1,1,1,0
+access_hr_employee_portal,hr.employee.portal,hr.model_hr_employee,base.group_portal,1,0,0,0

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Add approvals to portal menu -->
+    <template id="portal_my_home_menu_approvals" name="Portal layout : approval menu entries" inherit_id="portal.portal_breadcrumbs" priority="40">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'approval'" t-attf-class="breadcrumb-item #{'active ' if not approval else ''}">
+                <a t-if="approval" t-attf-href="/my/approvals?{{ keep_query() }}">Approval Requests</a>
+                <t t-else="">Approval Requests</t>
+            </li>
+            <li t-if="approval" class="breadcrumb-item active">
+                <span t-field="approval.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_home_approvals" name="Portal My Home : approval entries" inherit_id="portal.portal_my_home" priority="40">
+        <div id="portal_common_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/platinum_proj/static/src/img/portal-approval.svg'"/>
+                <t t-set="title">Approval Requests</t>
+                <t t-set="text">Submit and track your approval requests</t>
+                <t t-set="url" t-value="'/my/approvals'"/>
+                <t t-set="placeholder_count" t-value="'approval_count'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </div>
+    </template>
+
+</odoo>
+

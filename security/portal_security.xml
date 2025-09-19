@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Record rule: Portal users can only see their own approval requests -->
+    <record id="approval_request_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Own Approval Requests Only</field>
+        <field name="model_id" ref="approvals.model_approval_request"/>
+        <field name="domain_force">[('request_owner_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read approval categories -->
+    <record id="approval_category_portal_rule" model="ir.rule">
+        <field name="name">Portal User: All Active Approval Categories</field>
+        <field name="model_id" ref="approvals.model_approval_category"/>
+        <field name="domain_force">[('active', '=', True)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read approvers of their own requests -->
+    <record id="approval_approver_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Approvers of Own Requests</field>
+        <field name="model_id" ref="approvals.model_approval_approver"/>
+        <field name="domain_force">[('request_id.request_owner_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read employee info -->
+    <record id="hr_employee_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Employee Information</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+</odoo>
