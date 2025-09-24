@@ -14,17 +14,38 @@
         </xpath>
     </template>
 
-    <template id="portal_my_home_approvals" name="Portal My Home : approval entries" inherit_id="portal.portal_my_home" priority="40">
-        <div id="portal_common_category" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/platinum_proj/static/src/img/portal-approval.svg'"/>
-                <t t-set="title">Approval Requests</t>
-                <t t-set="text">Submit and track your approval requests</t>
-                <t t-set="url" t-value="'/my/approvals'"/>
-                <t t-set="placeholder_count" t-value="'approval_count'"/>
-                <t t-set="config_card" t-value="True"/>
-            </t>
+    <!-- Create separate employee portal category -->
+    <template id="portal_employee_category" name="Portal Employee Category" inherit_id="portal.portal_my_home" priority="35">
+        <div class="o_portal_docs row g-2" position="inside">
+            <div t-if="is_employee_user" class="o_portal_category row g-2 mt-3" id="portal_employee_category">
+                <div class="col-12">
+                    <h5 class="text-muted mb-3">Employee Services</h5>
+                </div>
+                <!-- Approval Requests Entry -->
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/platinum_proj/static/src/img/portal-approval.svg'"/>
+                    <t t-set="title">Approval Requests</t>
+                    <t t-set="text">Submit and track your approval requests</t>
+                    <t t-set="url" t-value="'/my/approvals'"/>
+                    <t t-set="count" t-value="approval_count"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </div>
         </div>
+    </template>
+
+    <!-- Hide other portal categories for employees -->
+    <template id="portal_hide_categories_for_employees" name="Hide Categories for Employees" inherit_id="portal.portal_my_home" priority="36">
+        <div id="portal_client_category" position="attributes">
+            <attribute name="t-if">not is_employee_user</attribute>
+        </div>
+        <div id="portal_service_category" position="attributes">
+            <attribute name="t-if">not is_employee_user</attribute>
+        </div>
+        <div id="portal_vendor_category" position="attributes">
+            <attribute name="t-if">not is_employee_user</attribute>
+        </div>
+        <!-- Keep portal_common_category available for all users (includes Connection & Security) -->
     </template>
 
 </odoo>

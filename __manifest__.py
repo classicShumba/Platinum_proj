@@ -24,6 +24,7 @@ Key Features:
     """,
     'depends': [
         'approvals',      # Core approval functionality
+        'approvals_purchase',  # Purchase approval type and functionality
         'hr',             # Employee data and departments
         'portal',         # Portal access framework
         'purchase',       # Purchase order integration
@@ -37,6 +38,7 @@ Key Features:
 
         # Data
         'data/cron_link_users.xml',
+        'data/update_procurement_category.xml',
         # 'data/approval_categories.xml',
 
         # Views

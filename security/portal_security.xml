@@ -49,4 +49,76 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
+    <!-- Record rule: Portal users can read UOM for product operations -->
+    <record id="uom_uom_portal_rule" model="ir.rule">
+        <field name="name">Portal User: UOM Read Access</field>
+        <field name="model_id" ref="uom.model_uom_uom"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read products for approval requests -->
+    <record id="product_product_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Product Read Access</field>
+        <field name="model_id" ref="product.model_product_product"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read product templates for approval requests -->
+    <record id="product_template_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Product Template Read Access</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read partners/vendors -->
+    <record id="res_partner_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Partner Read Access</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read stock locations for availability -->
+    <record id="stock_location_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Stock Location Read Access</field>
+        <field name="model_id" ref="stock.model_stock_location"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Record rule: Portal users can read stock quants for availability checking -->
+    <record id="stock_quant_portal_rule" model="ir.rule">
+        <field name="name">Portal User: Stock Quant Read Access</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
 </odoo>

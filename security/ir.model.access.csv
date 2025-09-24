@@ -5,3 +5,10 @@ access_approval_approver_portal,approval.approver.portal,approvals.model_approva
 access_approval_product_line_portal,approval.product.line.portal,approvals.model_approval_product_line,base.group_portal,1,1,1,0
 access_ir_attachment_portal,ir.attachment.portal,base.model_ir_attachment,base.group_portal,1,1,1,0
 access_hr_employee_portal,hr.employee.portal,hr.model_hr_employee,base.group_portal,1,0,0,0
+access_uom_uom_portal,uom.uom.portal,uom.model_uom_uom,base.group_portal,1,0,0,0
+access_product_product_portal,product.product.portal,product.model_product_product,base.group_portal,1,0,0,0
+access_product_template_portal,product.template.portal,product.model_product_template,base.group_portal,1,0,0,0
+access_res_partner_portal,res.partner.portal,base.model_res_partner,base.group_portal,1,0,0,0
+access_product_supplierinfo_portal,product.supplierinfo.portal,product.model_product_supplierinfo,base.group_portal,1,0,0,0
+access_stock_location_portal,stock.location.portal,stock.model_stock_location,base.group_portal,1,0,0,0
+access_stock_quant_portal,stock.quant.portal,stock.model_stock_quant,base.group_portal,1,0,0,0

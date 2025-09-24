@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Ensure we have a sequence for procurement requests -->
+        <record id="procurement_sequence" model="ir.sequence">
+            <field name="name">Procurement Request Sequence</field>
+            <field name="code">approval.request.procurement</field>
+            <field name="prefix">PR</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="number_next">1</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

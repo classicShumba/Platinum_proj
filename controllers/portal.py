@@ -12,6 +12,8 @@ import base64
 _logger = logging.getLogger(__name__)
 
 
+
+
 class EmployeePortal(CustomerPortal):
 
     @http.route()
@@ -23,16 +25,45 @@ class EmployeePortal(CustomerPortal):
         """Add approval requests to portal counters"""
         values = super()._prepare_home_portal_values(counters)
 
-        # Always add approval count for portal users
-        try:
-            approval_count = request.env['approval.request'].search_count([
-                ('request_owner_id', '=', request.env.user.id)
-            ])
-            values['approval_count'] = approval_count
-        except:
+        # Check if current user is an employee
+        is_employee_user = self._is_employee_user()
+        values['is_employee_user'] = is_employee_user
+
+        # Add approval count only for employee users
+        if is_employee_user:
+            try:
+                approval_count = request.env['approval.request'].search_count([
+                    ('request_owner_id', '=', request.env.user.id)
+                ])
+                values['approval_count'] = approval_count
+            except:
+                values['approval_count'] = 0
+        else:
             values['approval_count'] = 0
 
         return values
+
+    def _is_employee_user(self):
+        """Check if current user is linked to an employee record"""
+        if not request.env.user or request.env.user._is_public():
+            _logger.info(f"User check failed: user={request.env.user}, is_public={request.env.user._is_public() if request.env.user else 'No user'}")
+            return False
+
+        user_id = request.env.user.id
+        user_email = request.env.user.email
+
+        # Check if user has employee record (direct link or email match)
+        employee = request.env['hr.employee'].search([
+            '|',
+            ('user_id', '=', user_id),
+            ('work_email', '=', user_email)
+        ], limit=1)
+
+        _logger.info(f"Employee check for user {user_id} ({user_email}): employee found={bool(employee)}")
+        if employee:
+            _logger.info(f"Employee found: {employee.name} (id={employee.id})")
+
+        return bool(employee)
 
     def _get_approval_domain(self):
         """Get domain for user's approval requests"""
@@ -44,6 +75,11 @@ class EmployeePortal(CustomerPortal):
                            sortby=None, search=None, search_in='content',
                            groupby='none', filterby='all', **kw):
         """Employee portal page for approval requests"""
+        # Check if user is an employee
+        if not self._is_employee_user():
+            _logger.info(f"Access denied to /my/approvals for user {request.env.user.id} - not an employee")
+            return request.redirect('/my')
+
         values = self._prepare_portal_layout_values()
         ApprovalRequest = request.env['approval.request']
 
@@ -222,7 +258,20 @@ class EmployeePortal(CustomerPortal):
                 product_id = product_ids[i] if i < len(product_ids) and product_ids[i] else None
                 description = product_descriptions[i] if i < len(product_descriptions) else product_name
                 quantity = float(product_quantities[i]) if i < len(product_quantities) and product_quantities[i] else 1.0
-                uom_id = int(product_uoms[i]) if i < len(product_uoms) and product_uoms[i] else 1
+
+                # Get UOM - either from existing product or form input
+                if product_id:
+                    # Get UOM from existing product
+                    existing_product = request.env['product.product'].sudo().browse(int(product_id))
+                    uom_id = existing_product.sudo().uom_id.id if existing_product.exists() and existing_product.sudo().uom_id else None
+                else:
+                    # Use form input or get default UOM
+                    uom_id = int(product_uoms[i]) if i < len(product_uoms) and product_uoms[i] else None
+
+                # Get default UOM if still None
+                if not uom_id:
+                    default_uom = request.env['uom.uom'].sudo().search([('name', '=', 'Units')], limit=1)
+                    uom_id = default_uom.id if default_uom else 1
 
                 if not product_id:
                     # Create new product
@@ -313,6 +362,36 @@ class EmployeePortal(CustomerPortal):
                 'request_owner_id': request.env.user.id,
             }
 
+            # Handle stock requisition auto-location assignment
+            if category.name == 'Stock Requisition':
+                # Auto-assign employee's location as destination
+                employee = request.env['hr.employee'].search([
+                    '|',
+                    ('user_id', '=', request.env.user.id),
+                    ('work_email', '=', request.env.user.email)
+                ], limit=1)
+
+                if employee:
+                    # Try to find or create a location for the employee
+                    employee_location = request.env['stock.location'].sudo().search([
+                        ('name', 'ilike', employee.name),
+                        ('usage', '=', 'internal')
+                    ], limit=1)
+
+                    if not employee_location:
+                        # Create a location for this employee under main stock
+                        main_stock = request.env.ref('stock.stock_location_stock', False)
+                        employee_location = request.env['stock.location'].sudo().create({
+                            'name': f"{employee.name} - Workstation",
+                            'usage': 'internal',
+                            'company_id': request.env.company.id,
+                            'location_id': main_stock.id if main_stock else 1,
+                        })
+
+                    vals['dest_location_id'] = employee_location.id
+
+                # Source location will be determined based on product availability after processing product lines
+
             # Handle optional fields based on category configuration
             if category.has_date and post.get('date'):
                 vals['date'] = fields.Datetime.from_string(post.get('date'))
@@ -332,13 +411,50 @@ class EmployeePortal(CustomerPortal):
             if category.has_partner and post.get('partner_id'):
                 vals['partner_id'] = int(post.get('partner_id'))
 
+            # Handle vendor name for new vendor creation
+            if category.has_partner and post.get('vendor_name') and not post.get('partner_id'):
+                vendor_name = post.get('vendor_name').strip()
+                vendor_email = post.get('vendor_email', '').strip()
+                vendor_phone = post.get('vendor_phone', '').strip()
+
+                if vendor_name:
+                    # Try to find existing vendor first
+                    existing_vendor = request.env['res.partner'].sudo().search([
+                        ('name', '=ilike', vendor_name),
+                        ('is_company', '=', True)
+                    ], limit=1)
+
+                    if existing_vendor:
+                        vals['partner_id'] = existing_vendor.id
+                    else:
+                        # Create new vendor
+                        vendor_vals = {
+                            'name': vendor_name,
+                            'is_company': True,
+                            'supplier_rank': 1,
+                            'customer_rank': 0,
+                        }
+                        if vendor_email:
+                            vendor_vals['email'] = vendor_email
+                        if vendor_phone:
+                            vendor_vals['phone'] = vendor_phone
+
+                        new_vendor = request.env['res.partner'].sudo().create(vendor_vals)
+                        vals['partner_id'] = new_vendor.id
+
             # Handle product lines if any (equipment/items)
             # Get form data using request.httprequest to access form arrays
             product_names = request.httprequest.form.getlist('product_name[]')
             product_ids = request.httprequest.form.getlist('product_id[]')
             product_descriptions = request.httprequest.form.getlist('product_description[]')
             product_quantities = request.httprequest.form.getlist('product_quantity[]')
+            product_prices = request.httprequest.form.getlist('product_price[]')
+            product_vendor_ids = request.httprequest.form.getlist('product_vendor_id[]')
             product_uoms = request.httprequest.form.getlist('product_uom[]')
+
+            # Debug logging
+            _logger.info(f"Product vendor IDs submitted: {product_vendor_ids}")
+            _logger.info(f"Product prices submitted: {product_prices}")
 
             if product_names:
                 product_lines = []
@@ -348,7 +464,22 @@ class EmployeePortal(CustomerPortal):
                         product_id = product_ids[i] if i < len(product_ids) and product_ids[i] else None
                         description = product_descriptions[i] if i < len(product_descriptions) else product_name
                         quantity = float(product_quantities[i]) if i < len(product_quantities) and product_quantities[i] else 1.0
-                        uom_id = int(product_uoms[i]) if i < len(product_uoms) and product_uoms[i] else 1
+                        price = float(product_prices[i]) if i < len(product_prices) and product_prices[i] else 0.0
+                        vendor_id = int(product_vendor_ids[i]) if i < len(product_vendor_ids) and product_vendor_ids[i] else None
+
+                        # Get UOM - either from existing product or form input
+                        if product_id:
+                            # Get UOM from existing product
+                            existing_product = request.env['product.product'].sudo().browse(int(product_id))
+                            uom_id = existing_product.sudo().uom_id.id if existing_product.exists() and existing_product.sudo().uom_id else None
+                        else:
+                            # Use form input or get default UOM
+                            uom_id = int(product_uoms[i]) if i < len(product_uoms) and product_uoms[i] else None
+
+                        # Get default UOM if still None
+                        if not uom_id:
+                            default_uom = request.env['uom.uom'].sudo().search([('name', '=', 'Units')], limit=1)
+                            uom_id = default_uom.id if default_uom else 1
 
                         # Create new product if no product_id provided
                         if not product_id:
@@ -358,8 +489,11 @@ class EmployeePortal(CustomerPortal):
                                 'categ_id': 1,  # Default product category
                                 'uom_id': uom_id,
                                 'uom_po_id': uom_id,
+                                'sale_ok': False,
+                                'purchase_ok': True,
+                                'is_storable': True,
                             }
-                            # Use sudo() since portal users don't have direct product creation access
+                            # Note: Portal users still need sudo for product creation
                             new_product = request.env['product.product'].sudo().create(product_vals)
                             product_id = new_product.id
 
@@ -370,10 +504,47 @@ class EmployeePortal(CustomerPortal):
                             'product_id': int(product_id),
                         }
 
+                        # Add procurement-specific fields for purchase-type categories
+                        if category.approval_type == 'purchase':
+                            _logger.info(f"Processing purchase-type line {i}: price={price}, vendor_id={vendor_id}")
+                            if price > 0:
+                                line_vals['price_unit'] = price
+                            if vendor_id:
+                                line_vals['vendor_id'] = vendor_id
+
+                                # Also create/find supplier info for RFQ creation
+                                # The approvals_purchase addon expects seller_id to be set
+                                product_template_id = new_product.product_tmpl_id.id if not product_id else \
+                                                    request.env['product.product'].sudo().browse(int(product_id)).product_tmpl_id.id
+
+                                supplier_info = request.env['product.supplierinfo'].sudo().search([
+                                    ('partner_id', '=', vendor_id),
+                                    ('product_tmpl_id', '=', product_template_id)
+                                ], limit=1)
+
+                                if not supplier_info:
+                                    # Create supplier info for this vendor-product combination
+                                    supplier_info = request.env['product.supplierinfo'].sudo().create({
+                                        'partner_id': vendor_id,
+                                        'product_tmpl_id': product_template_id,
+                                        'min_qty': 1.0,
+                                        'price': price if price > 0 else 0.0,
+                                        'currency_id': request.env.company.currency_id.id,
+                                        'company_id': request.env.company.id,
+                                    })
+
+                                line_vals['seller_id'] = supplier_info.id
+
                         product_lines.append((0, 0, line_vals))
 
                 if product_lines:
                     vals['product_line_ids'] = product_lines
+
+                    # For stock requisitions, auto-assign source location based on product availability
+                    if category.name == 'Stock Requisition':
+                        source_location = self._find_best_source_location(product_lines)
+                        if source_location:
+                            vals['source_location_id'] = source_location.id
 
             # Create new request (use sudo for sequence access)
             approval = request.env['approval.request'].sudo().create(vals)
@@ -382,17 +553,30 @@ class EmployeePortal(CustomerPortal):
             if request.httprequest.files:
                 for file_key, file in request.httprequest.files.items():
                     if file.filename:
+                        # Determine if this is a quotation based on field name or file type
+                        is_quotation = (
+                            'quotation' in file_key.lower() or
+                            'quote' in file.filename.lower() or
+                            file.filename.lower().endswith(('.pdf', '.doc', '.docx'))
+                        )
+
                         attachment_vals = {
                             'name': file.filename,
                             'datas': base64.b64encode(file.read()),
                             'res_model': 'approval.request',
                             'res_id': approval.id,
+                            'description': 'Quotation' if is_quotation else 'Supporting Document',
                         }
+
+                        # Add quotation-specific metadata if available
+                        if is_quotation and vals.get('partner_id'):
+                            attachment_vals['res_field'] = f'quotation_vendor_{vals["partner_id"]}'
+
                         request.env['ir.attachment'].sudo().create(attachment_vals)
 
             # Submit the request (always confirm for portal submissions)
             # Portal users create requests that go directly into the approval workflow
-            approval.action_confirm()
+            approval.sudo().action_confirm()
 
             return request.redirect(f'/my/approval/{approval.id}')
 
@@ -412,7 +596,6 @@ class EmployeePortal(CustomerPortal):
         document_sudo = document.sudo()
 
         try:
-            document.check_access('read')
             document.check_access('read')
         except AccessError:
             # Check if user owns this request
@@ -436,17 +619,21 @@ class EmployeePortal(CustomerPortal):
             ('barcode', 'ilike', search)
         ]
 
-        # Use sudo() since portal users don't have direct product access
+        # Use sudo() until security rules take effect after module upgrade
         products = request.env['product.product'].sudo().search(domain, limit=limit)
 
         product_list = []
         for product in products:
+            # Use sudo() for UOM access until security rules take effect
+            uom_name = product.sudo().uom_id.name if product.sudo().uom_id else 'Units'
+            uom_id = product.sudo().uom_id.id if product.sudo().uom_id else 1
+
             product_list.append({
                 'id': product.id,
                 'name': product.name,
                 'default_code': product.default_code,
-                'uom_name': product.uom_id.name,
-                'uom_id': product.uom_id.id,
+                'uom_name': uom_name,
+                'uom_id': uom_id,
             })
 
         return {'products': product_list}
@@ -454,18 +641,196 @@ class EmployeePortal(CustomerPortal):
     @http.route(['/my/approval/get_product_info'], type='json', auth="user", website=True)
     def portal_get_product_info(self, product_id, **kw):
         """Get detailed product information"""
-        # Use sudo() since portal users don't have direct product access
+        # Use sudo() until security rules take effect after module upgrade
         product = request.env['product.product'].sudo().browse(int(product_id))
         if not product.exists():
             return {}
+
+        # Use sudo() for UOM access until security rules take effect
+        uom_name = product.sudo().uom_id.name if product.sudo().uom_id else 'Units'
+        uom_id = product.sudo().uom_id.id if product.sudo().uom_id else 1
 
         return {
             'id': product.id,
             'name': product.name,
             'description': product.description_sale or product.name,
             'default_code': product.default_code,
-            'uom_name': product.uom_id.name,
-            'uom_id': product.uom_id.id,
+            'uom_name': uom_name,
+            'uom_id': uom_id,
             'categ_id': product.categ_id.id,
             'list_price': product.list_price,
         }
+
+    @http.route(['/my/approval/search_vendors'], type='json', auth="user", website=True)
+    def portal_search_vendors(self, search='', limit=10, **kw):
+        """Search vendors for approval requests"""
+        if not search or len(search) < 2:
+            return {'vendors': []}
+
+        domain = [
+            ('is_company', '=', True),
+            ('supplier_rank', '>', 0),
+            '|', '|',
+            ('name', 'ilike', search),
+            ('email', 'ilike', search),
+            ('vat', 'ilike', search)
+        ]
+
+        # Use sudo() since portal users don't have direct partner access
+        vendors = request.env['res.partner'].sudo().search(domain, limit=limit)
+
+        vendor_list = []
+        for vendor in vendors:
+            vendor_list.append({
+                'id': vendor.id,
+                'name': vendor.name,
+                'email': vendor.email or '',
+                'phone': vendor.phone or '',
+                'vat': vendor.vat or '',
+                'city': vendor.city or '',
+                'country': vendor.country_id.name if vendor.country_id else '',
+            })
+
+        return {'vendors': vendor_list}
+
+    @http.route(['/my/approval/create_vendor'], type='json', auth="user", website=True)
+    def portal_create_vendor(self, name, email='', phone='', **kw):
+        """Create new vendor from portal"""
+        if not name or len(name.strip()) < 2:
+            return {'success': False, 'message': 'Vendor name is required'}
+
+        try:
+            # Check if vendor already exists
+            existing_vendor = request.env['res.partner'].sudo().search([
+                ('name', '=ilike', name.strip()),
+                ('is_company', '=', True)
+            ], limit=1)
+
+            if existing_vendor:
+                return {
+                    'success': True,
+                    'vendor': {
+                        'id': existing_vendor.id,
+                        'name': existing_vendor.name,
+                        'email': existing_vendor.email or '',
+                        'phone': existing_vendor.phone or '',
+                        'existing': True
+                    }
+                }
+
+            # Create new vendor
+            vendor_vals = {
+                'name': name.strip(),
+                'is_company': True,
+                'supplier_rank': 1,
+                'customer_rank': 0,
+            }
+
+            if email and email.strip():
+                vendor_vals['email'] = email.strip()
+            if phone and phone.strip():
+                vendor_vals['phone'] = phone.strip()
+
+            new_vendor = request.env['res.partner'].sudo().create(vendor_vals)
+
+            return {
+                'success': True,
+                'vendor': {
+                    'id': new_vendor.id,
+                    'name': new_vendor.name,
+                    'email': new_vendor.email or '',
+                    'phone': new_vendor.phone or '',
+                    'existing': False
+                }
+            }
+
+        except Exception as e:
+            _logger.error(f"Error creating vendor: {e}")
+            return {'success': False, 'message': 'Error creating vendor. Please try again.'}
+
+    @http.route(['/my/approval/check_stock_availability'], type='json', auth="user", website=True)
+    def portal_check_stock_availability(self, product_id, quantity=1, **kw):
+        """Check stock availability for a product across all locations"""
+        if not product_id:
+            return {'available': False, 'locations': []}
+
+        product = request.env['product.product'].sudo().browse(int(product_id))
+        if not product.exists():
+            return {'available': False, 'locations': []}
+
+        # Get all internal locations
+        locations = request.env['stock.location'].sudo().search([
+            ('usage', '=', 'internal'),
+            ('company_id', '=', request.env.company.id)
+        ])
+
+        location_availability = []
+        total_available = 0
+
+        for location in locations:
+            available_qty = request.env['stock.quant'].sudo()._get_available_quantity(
+                product,
+                location,
+                strict=True
+            )
+
+            if available_qty > 0:
+                location_availability.append({
+                    'location_id': location.id,
+                    'location_name': location.complete_name,
+                    'available_qty': available_qty,
+                    'sufficient': available_qty >= float(quantity)
+                })
+                total_available += available_qty
+
+        return {
+            'available': total_available >= float(quantity),
+            'total_available': total_available,
+            'locations': location_availability,
+            'product_name': product.name
+        }
+
+    def _find_best_source_location(self, product_lines):
+        """Find the best source location based on product availability"""
+        # Get all internal locations
+        locations = request.env['stock.location'].sudo().search([
+            ('usage', '=', 'internal'),
+            ('company_id', '=', request.env.company.id)
+        ])
+
+        location_scores = {}
+
+        for location in locations:
+            score = 0
+            total_products = 0
+
+            # Check availability of each product in this location
+            for line_data in product_lines:
+                # Extract product_id from the line data tuple (0, 0, {dict})
+                if len(line_data) >= 3 and isinstance(line_data[2], dict):
+                    product_id = line_data[2].get('product_id')
+                    quantity = line_data[2].get('quantity', 1)
+
+                    if product_id:
+                        total_products += 1
+                        available_qty = request.env['stock.quant'].sudo()._get_available_quantity(
+                            request.env['product.product'].browse(product_id),
+                            location,
+                            strict=True
+                        )
+
+                        if available_qty >= quantity:
+                            score += 1  # Full availability
+                        elif available_qty > 0:
+                            score += 0.5  # Partial availability
+
+            if total_products > 0:
+                location_scores[location] = score / total_products
+
+        # Return location with highest availability score
+        if location_scores:
+            best_location = max(location_scores, key=location_scores.get)
+            return best_location if location_scores[best_location] > 0 else None
+
+        # Fallback to main stock location if no products or no availability found
+        return request.env.ref('stock.stock_location_stock', False)
